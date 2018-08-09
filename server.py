@@ -7,9 +7,9 @@ import hashlib
 import io
 import json
 import os
-#import pylab
+import pylab
 import sys
-
+import numpy as np
 sys.path.append('./coco-caption/')
 from pycocotools.coco import COCO
 from pycocoevalcap.eval import COCOEvalCap
@@ -61,7 +61,7 @@ class CocoResFormat:
 
 def main():
   HASH_IMG_NAME = True
-  #pylab.rcParams['figure.figsize'] = (10.0, 8.0)
+  pylab.rcParams['figure.figsize'] = (10.0, 8.0)
   json.encoder.FLOAT_REPR = lambda o: format(o, '.3f')
 
   parser = argparse.ArgumentParser()
@@ -92,13 +92,16 @@ def main():
   for metric, score in cocoEval.eval.items():
     print '%s: %.3f'%(metric, score)
   
-def calcScore(prediction_file,reference_file):
+def calcScore(prediction_file):
   HASH_IMG_NAME = True
   pylab.rcParams['figure.figsize'] = (10.0, 8.0)
   json.encoder.FLOAT_REPR = lambda o: format(o, '.3f')
+  with open('data/gentmp.txt','w+') as f:
+    f.write(prediction_file)
+  prediction_file ='data/gentmp.txt'
+  reference_file = 'data/ref_dev.json'
 
   json_predictions_file = '{0}.json'.format(prediction_file)
-  
   crf = CocoResFormat()
   crf.read_file(prediction_file, HASH_IMG_NAME)
   crf.dump_json(json_predictions_file)
@@ -114,7 +117,37 @@ def calcScore(prediction_file,reference_file):
   cocoEval.evaluate()
   
   # print output evaluation scores
-  return cocoEval.eval.items()
-  
+  scores=[]
+  for _,i in cocoEval.eval.items():
+    scores.append(float(i))
+  return scores
+
+from SimpleXMLRPCServer import SimpleXMLRPCServer
+from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
+
+# Restrict to a particular path.
+class RequestHandler(SimpleXMLRPCRequestHandler):
+    rpc_paths = ('/RPC2',)
+
+# Create server
+server = SimpleXMLRPCServer(("10.21.230.64", 8778),
+                            requestHandler=RequestHandler)
+server.register_introspection_functions()
+
+# Register pow() function; this will use the value of
+# pow.__name__ as the name, which is just 'pow'.
+
+
+# Register a function under a different name
+
+server.register_function(calcScore)
+
+# Register an instance; all the methods of the instance are
+# published as XML-RPC methods (in this case, just 'div').
+
+# Run the server's main loop
+server.serve_forever()
+
+
 if __name__ == "__main__":
     main()
